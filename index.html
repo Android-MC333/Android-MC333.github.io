@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>单键跳跃跑酷 · Jump Runner</title>
+<meta name="description" content="一个键的跑酷原型。按住蓄力，松开起跳，跳多高取决于你按了多久。五关 + 无尽，灰盒 v0.5。">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Space+Grotesk:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<style>
+/* ============================================================
+   0. 变量与基础
+   ============================================================ */
+:root{
+  --bg:#0a0a11;
+  --bg2:#0e0e17;
+  --panel:#12121c;
+  --fg:#ece9f6;
+  --dim:#9b98aa;
+  --faint:#615f70;
+  --cyan:#4fe3dc;
+  --magenta:#ff4d8d;
+  --gold:#ffc24b;
+  --line:rgba(255,255,255,.085);
+  --line2:rgba(255,255,255,.16);
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:"Space Grotesk","Noto Sans SC",-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  --pad:clamp(20px,4vw,44px);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font-family:var(--sans);font-weight:400;
+  -webkit-font-smoothing:antialiased;
+  line-height:1.75;
+  overflow-x:hidden;
+}
+::selection{background:var(--cyan);color:#04120f}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+.mono{font-family:var(--mono)}
+.wrap{max-width:1140px;margin:0 auto;padding:0 var(--pad)}
+
+/* ============================================================
+   1. 顶栏
+   ============================================================ */
+.top{
+  position:sticky;top:0;z-index:50;
+  background:rgba(10,10,17,.82);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+}
+.top .in{
+  max-width:1140px;margin:0 auto;padding:0 var(--pad);
+  height:62px;display:flex;align-items:center;gap:20px;
+}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand b{font-size:15px;letter-spacing:.14em;font-weight:700}
+.brand span{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.06em}
+nav{display:flex;gap:22px;font-size:13px;color:var(--dim)}
+nav a{padding:4px 0;border-bottom:1px solid transparent;transition:.2s}
+nav a:hover{color:var(--fg);border-color:var(--line2)}
+.tag{
+  font-family:var(--mono);font-size:11px;letter-spacing:.05em;
+  color:var(--cyan);border:1px solid rgba(79,227,220,.35);
+  padding:3px 9px;border-radius:2px;white-space:nowrap;
+}
+@media (max-width:820px){nav{display:none}.brand span{display:none}}
+
+/* ============================================================
+   2. Hero
+   ============================================================ */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero::before{
+  content:"";position:absolute;inset:-30% -10% auto -10%;height:120%;
+  background:
+    radial-gradient(680px 420px at 78% 12%, rgba(255,77,141,.16), transparent 62%),
+    radial-gradient(700px 500px at 12% 8%, rgba(79,227,220,.13), transparent 60%),
+    linear-gradient(180deg,#141426 0%,#0d0d18 55%,var(--bg) 100%);
+  pointer-events:none;
+}
+.hero .in{
+  position:relative;max-width:1140px;margin:0 auto;padding:clamp(48px,7vw,92px) var(--pad) clamp(40px,5vw,68px);
+  display:grid;grid-template-columns:1.08fr .92fr;gap:clamp(24px,5vw,56px);align-items:center;
+}
+.eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--cyan);
+  margin:0 0 22px;text-transform:uppercase;
+}
+h1{
+  font-size:clamp(38px,6.4vw,72px);line-height:1.05;letter-spacing:-.02em;
+  margin:0 0 8px;font-weight:700;
+}
+h1 .k{position:relative;display:inline-block}
+h1 .k svg{position:absolute;left:0;right:0;bottom:-6px;width:100%;height:12px;overflow:visible}
+.lede{
+  font-size:clamp(15px,1.5vw,17px);color:var(--dim);max-width:34em;
+  margin:26px 0 0;font-weight:300;line-height:1.9;
+}
+.lede b{color:var(--fg);font-weight:500}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}
+.btn{
+  font-family:var(--mono);font-size:12px;letter-spacing:.06em;
+  padding:11px 18px;border:1px solid var(--line2);border-radius:2px;
+  background:transparent;color:var(--fg);cursor:pointer;transition:.18s;
+}
+.btn:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.32)}
+.btn.primary{background:var(--cyan);border-color:var(--cyan);color:#06211f;font-weight:700}
+.btn.primary:hover{background:#7ff0e9;border-color:#7ff0e9}
+
+/* 三张竖图，轻微错位 —— 手摆的，别太正 */
+.shots{position:relative;display:flex;justify-content:flex-end;align-items:flex-end;min-height:400px}
+.shots figure{margin:0;position:absolute;box-shadow:0 24px 60px -22px rgba(0,0,0,.9)}
+.shots img{border:1px solid var(--line2);border-radius:3px}
+.shots .a{width:min(52%,250px);left:0;right:auto;bottom:26px;transform:rotate(-2.2deg);opacity:.9}
+.shots .b{width:min(47%,230px);right:0;bottom:0;transform:rotate(1.6deg);z-index:2}
+.shots .cap{
+  position:absolute;left:0;bottom:-30px;font-family:var(--mono);font-size:10px;
+  color:var(--faint);letter-spacing:.04em;white-space:nowrap;
+}
+@media (max-width:900px){
+  .hero .in{grid-template-columns:1fr}
+  .shots{min-height:0;margin-top:46px;justify-content:flex-start}
+  .shots .a{position:relative;right:auto;bottom:auto;width:42%;transform:rotate(-2deg);margin-right:-14px}
+  .shots .b{position:relative;width:52%}
+  .shots .cap{position:static;margin-top:18px}
+}
+
+/* ============================================================
+   3. 规格条
+   ============================================================ */
+.specs{border-bottom:1px solid var(--line);background:var(--bg2)}
+.specs .in{
+  max-width:1140px;margin:0 auto;padding:14px var(--pad);
+  display:flex;flex-wrap:wrap;gap:8px 28px;
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;color:var(--faint);
+}
+.specs b{color:var(--dim);font-weight:400}
+.specs i{color:var(--line2);font-style:normal}
+
+/* ============================================================
+   4. 小节骨架：左侧标号栏
+   ============================================================ */
+.sec{border-bottom:1px solid var(--line)}
+.sec .in{
+  max-width:1140px;margin:0 auto;padding:clamp(44px,6vw,76px) var(--pad);
+  display:grid;grid-template-columns:118px 1fr;gap:clamp(16px,3vw,36px);
+}
+.label{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--faint);
+  padding-top:8px;text-transform:uppercase;
+}
+.label em{display:block;color:var(--cyan);font-style:normal;font-size:13px;letter-spacing:.1em;margin-bottom:6px}
+h2{font-size:clamp(24px,3.2vw,34px);line-height:1.25;margin:0 0 18px;letter-spacing:-.01em;font-weight:500}
+h2 .thin{color:var(--dim);font-weight:300}
+p{margin:0 0 16px;max-width:42em}
+.muted{color:var(--dim);font-weight:300}
+@media (max-width:760px){.sec .in{grid-template-columns:1fr}.label{padding-top:0}}
+
+/* ============================================================
+   5. 试按演示
+   ============================================================ */
+.demo-wrap{display:grid;grid-template-columns:1.25fr .75fr;gap:clamp(20px,4vw,44px);align-items:center;margin-top:8px}
+@media (max-width:820px){.demo-wrap{grid-template-columns:1fr}}
+.demo{
+  position:relative;border:1px solid var(--line2);border-radius:3px;overflow:hidden;
+  background:linear-gradient(180deg,#1b1630,#12101f 60%,#0c0c15);
+  cursor:pointer;user-select:none;touch-action:manipulation;
+}
+.demo canvas{display:block;width:100%;height:clamp(210px,26vw,260px)}
+.demo .hint{
+  position:absolute;left:14px;top:12px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.06em;color:rgba(255,255,255,.42);pointer-events:none;
+}
+.demo .hint b{color:var(--cyan);font-weight:400}
+.readout{display:grid;gap:0;border-top:1px solid var(--line);margin:0}
+.readout div{
+  display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  padding:10px 0;border-bottom:1px dashed rgba(255,255,255,.07);
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+}
+.readout div > span:first-child{color:var(--faint)}
+.readout b{color:var(--fg);font-weight:400;font-size:16px;font-variant-numeric:tabular-nums}
+.readout b small{font-size:10px;color:var(--faint);margin-left:3px}
+.bar{position:relative;height:6px;background:rgba(255,255,255,.07);border-radius:1px;margin:16px 0 4px;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;width:0%;background:linear-gradient(90deg,var(--cyan),var(--gold));transition:width .04s linear}
+.bar-cap{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.04em}
+
+/* ============================================================
+   6. 三个动词 / 数字卡
+   ============================================================ */
+.verbs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin:28px 0 8px}
+.verbs > div{background:var(--bg);padding:22px 24px 24px}
+.verbs h3{margin:0 0 8px;font-size:15px;font-weight:500;letter-spacing:.02em}
+.verbs .n{font-family:var(--mono);font-size:10px;color:var(--cyan);letter-spacing:.14em;display:block;margin-bottom:14px}
+.verbs p{margin:0;font-size:13.5px;color:var(--dim);line-height:1.8}
+@media (max-width:760px){.verbs{grid-template-columns:1fr}}
+
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;margin:34px 0 0}
+.nums div{border-top:1px solid var(--line2);padding-top:14px}
+.nums b{display:block;font-family:var(--mono);font-size:26px;font-weight:400;letter-spacing:-.02em;line-height:1.2}
+.nums b u{color:var(--faint);font-size:12px;text-decoration:none;margin-left:4px}
+.nums span{font-size:12px;color:var(--faint)}
+@media (max-width:760px){.nums{grid-template-columns:repeat(2,1fr);gap:20px}}
+
+/* ============================================================
+   7. 关卡表
+   ============================================================ */
+.levels{margin-top:26px;border-top:1px solid var(--line2)}
+.row{
+  display:grid;grid-template-columns:42px 1fr 84px 108px 132px;
+  gap:14px;align-items:baseline;padding:15px 8px 15px 0;
+  border-bottom:1px solid var(--line);font-size:13.5px;
+  transition:background .18s;
+}
+.row:hover{background:rgba(255,255,255,.028)}
+.row .i{font-family:var(--mono);color:var(--faint);font-size:11px}
+.row .name{font-size:15px;font-weight:500;letter-spacing:.01em}
+.row .m,.row .s,.row .d{font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.03em}
+.row .d{color:var(--faint)}
+@media (max-width:760px){
+  .row{grid-template-columns:32px 1fr 70px;font-size:13px}
+  .row .s,.row .d{grid-column:2;font-size:11px;color:var(--faint)}
+}
+.note{
+  margin-top:20px;font-family:var(--mono);font-size:11px;color:var(--faint);
+  letter-spacing:.03em;line-height:1.9;
+}
+.note code{font-size:11.5px;color:#c8c6d6}
+.log .e code{font-family:var(--mono);font-size:12.5px;color:#c8c6d6}
+
+/* 双图 */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,3vw,28px);margin-top:40px}
+.pair figure{margin:0}
+.pair img{border:1px solid var(--line2);border-radius:3px;width:100%}
+.pair figcaption{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:10px;letter-spacing:.04em}
+@media (max-width:640px){.pair{grid-template-columns:1fr}}
+
+/* ============================================================
+   8. 陷阱卡
+   ============================================================ */
+.traps{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);margin-top:30px}
+.traps article{background:var(--bg);padding:0 0 22px}
+.traps .pic{height:clamp(190px,22vw,250px);overflow:hidden;border-bottom:1px solid var(--line)}
+.traps .pic img{width:100%;height:100%;object-fit:cover;object-position:50% 58%}
+.traps .tx{padding:18px 22px 0}
+.traps h3{margin:0 0 6px;font-size:15px;font-weight:500}
+.traps .k{font-family:var(--mono);font-size:10px;color:var(--magenta);letter-spacing:.12em;display:block;margin-bottom:12px}
+.traps p{margin:0;font-size:13px;color:var(--dim);line-height:1.8}
+@media (max-width:820px){.traps{grid-template-columns:1fr}}
+
+.quote{
+  margin:44px 0 0;padding:26px 0 26px 26px;border-left:2px solid var(--gold);
+  font-size:clamp(17px,2.2vw,21px);line-height:1.7;color:var(--fg);font-weight:300;
+}
+.quote cite{display:block;margin-top:12px;font-family:var(--mono);font-style:normal;font-size:11px;color:var(--faint);letter-spacing:.04em}
+
+/* ============================================================
+   9. 更新日志
+   ============================================================ */
+.log{margin-top:26px;border-top:1px solid var(--line2)}
+.log .e{
+  display:grid;grid-template-columns:118px 1fr;gap:20px;
+  padding:20px 0;border-bottom:1px solid var(--line);
+}
+.log .t{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.04em;padding-top:3px}
+.log .t b{display:block;color:var(--cyan);font-weight:400;font-size:12px;letter-spacing:.06em;margin-top:5px}
+.log h4{margin:0 0 6px;font-size:14.5px;font-weight:500}
+.log p{margin:0;font-size:13px;color:var(--dim);line-height:1.85;max-width:44em}
+@media (max-width:640px){.log .e{grid-template-columns:1fr;gap:6px}}
+
+/* ============================================================
+   10. 跑起来 / 代码块
+   ============================================================ */
+.run{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,3vw,32px);margin-top:26px}
+@media (max-width:820px){.run{grid-template-columns:1fr}}
+.code{
+  position:relative;background:#0b0b14;border:1px solid var(--line2);border-radius:3px;
+  padding:16px 18px 18px;font-family:var(--mono);font-size:12px;line-height:2;color:#c8c6d6;white-space:pre;
+  overflow-x:auto;
+}
+.code .c{color:var(--faint)}
+.code .p{color:var(--cyan)}
+.code .s{color:var(--gold)}
+.code .btn-copy{
+  position:absolute;right:10px;top:10px;font-family:var(--mono);font-size:10px;
+  background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--dim);
+  padding:4px 8px;border-radius:2px;cursor:pointer;letter-spacing:.05em;
+}
+.code .btn-copy:hover{color:var(--fg);border-color:var(--line2)}
+.h5{margin:0 0 12px;font-size:13px;color:var(--dim)}
+.h5 b{color:var(--fg);font-weight:500;font-family:var(--mono);font-size:12px;letter-spacing:.05em}
+
+/* ============================================================
+   11. 下载条
+   ============================================================ */
+.dl{
+  display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;
+  margin-top:26px;padding:16px 0;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);
+}
+.dl .t{font-size:13px;color:var(--dim);line-height:1.7;flex:1 1 520px;min-width:0}
+.dl .t b{display:block;font-weight:500;color:var(--fg);font-size:14px;margin-bottom:3px}
+.dl .t code{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+.dl .act{flex:none;display:flex;gap:10px;flex-wrap:wrap}
+
+/* ============================================================
+   12. 还没做的
+   ============================================================ */
+.not{
+  margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:10px 34px;
+  font-size:13.5px;color:var(--dim);
+}
+.not li{display:flex;gap:10px;align-items:baseline;line-height:1.8}
+.not li::before{content:"—";color:var(--faint);font-family:var(--mono)}
+@media (max-width:640px){.not{grid-template-columns:1fr}}
+
+/* ============================================================
+   12. 页脚
+   ============================================================ */
+footer{border-top:1px solid var(--line2);margin-top:0}
+footer .in{
+  max-width:1140px;margin:0 auto;padding:clamp(38px,5vw,60px) var(--pad);
+  display:grid;grid-template-columns:1fr auto;gap:26px;align-items:end;
+}
+footer .big{font-size:clamp(20px,3vw,28px);letter-spacing:-.01em;line-height:1.5;font-weight:300;max-width:24em}
+footer .big b{color:var(--fg);font-weight:500}
+footer .meta{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.05em;text-align:right;line-height:2.1}
+@media (max-width:700px){footer .in{grid-template-columns:1fr}footer .meta{text-align:left}}
+
+/* 入场 */
+[data-reveal]{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.7,.2,1)}
+[data-reveal].rv{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){[data-reveal]{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<!-- ===== 顶栏 ===== -->
+<header class="top">
+  <div class="in">
+    <div class="brand"><b>JUMP RUNNER</b><span>单键跳跃跑酷</span></div>
+    <nav>
+      <a href="#how">玩法</a>
+      <a href="#levels">关卡</a>
+      <a href="#traps">陷阱</a>
+      <a href="#log">更新</a>
+      <a href="#run">下载</a>
+    </nav>
+    <span class="tag">灰盒 v0.5</span>
+  </div>
+</header>
+
+<!-- ===== Hero ===== -->
+<section class="hero">
+  <div class="in">
+    <div>
+      <p class="eyebrow">一个按键 · 一条命 · 五关</p>
+      <h1>按住空格，<br>松开<span class="k">就跳<svg viewBox="0 0 200 12" aria-hidden="true"><path d="M2 8 C 40 2, 66 11, 100 5 S 160 2, 198 7" fill="none" stroke="#ffc24b" stroke-width="2.4" stroke-linecap="round" opacity=".9"/></svg></span>。</h1>
+      <p class="lede">
+        跳多高，只看你按了多久。<b>0.22 秒蓄满</b>，从 520 到 880 px/s 的起跳速度，
+        全部压力都压在那零点几秒里。掉下去、踩到刺、撞上断口侧面，就是从头再来一段。
+        地形每关固定种子——所以它是能练会的，不是赌运气。
+      </p>
+      <div class="actions">
+        <a class="btn primary" href="#demo">试按一下</a>
+        <a class="btn" href="#run">在本地跑起来</a>
+      </div>
+    </div>
+    <div class="shots">
+      <figure class="a"><img src="assets/zone-dusk.png" alt="第 3 关紫红黄昏区段的实机画面"></figure>
+      <figure class="b"><img src="assets/hero-gold.png" alt="第 5 关终局疾驰的实机画面"></figure>
+      <span class="cap">实机截图 · 540×960 · 2026-11-21 渲染</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 规格条 ===== -->
+<div class="specs">
+  <div class="in">
+    <span><b>540×960</b> 竖屏</span><i>·</i>
+    <span><b>1</b> 个按键</span><i>·</i>
+    <span><b>5</b> 关 + 无尽</span><i>·</i>
+    <span><b>120~210</b> 米／关</span><i>·</i>
+    <span><b>0</b> 音效（还没做）</span><i>·</i>
+    <span><b>Python</b> + pygame-ce</span>
+  </div>
+</div>
+
+<!-- ===== 试按 ===== -->
+<section class="sec" id="demo">
+  <div class="in">
+    <div class="label"><em>试一下</em>Charge</div>
+    <div>
+      <h2>按住，然后松手。<span class="thin">它和游戏里是同一套物理。</span></h2>
+      <p class="muted">这里用的就是游戏里的常数：重力 1500、起跳 520~880、蓄满 0.22 秒。下面的「顶点」是这次起跳会到的高度——游戏里你只能凭手感估，这里直接告诉你。</p>
+
+      <div class="demo-wrap">
+        <div class="demo" id="demoPanel">
+          <span class="hint">按住 <b>SPACE</b> 或按住这块</span>
+          <canvas id="demoCanvas" aria-label="蓄力跳演示"></canvas>
+        </div>
+        <div>
+          <div class="readout">
+            <div><span>蓄力</span><b><span id="rCharge">0</span><small>ms</small></b></div>
+            <div><span>起跳速度</span><b><span id="rVel">520</span><small>px/s</small></b></div>
+            <div><span>顶点高度</span><b><span id="rApex">90</span><small>px</small></b></div>
+          </div>
+          <div class="bar"><i id="rBar"></i></div>
+          <div class="bar-cap"><span>0</span><span>0.22 s 蓄满</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 玩法 ===== -->
+<section class="sec" id="how">
+  <div class="in">
+    <div class="label"><em>01</em>玩法</div>
+    <div>
+      <h2>只有三个动词，而且只有一个需要你按。</h2>
+      <p class="muted">没做滑铲、冲刺、攻击。每加一个动词之前我都会先问一句：它是让跳跃更深，还是只是多了一个按钮。目前答案是后者，所以都没加。</p>
+
+      <div class="verbs" data-reveal>
+        <div>
+          <span class="n">动词 01</span>
+          <h3>跑（自动）</h3>
+          <p>不用按。速度从 380 一路上到 620，关卡里线性爬升，同一关的节奏是固定的。</p>
+        </div>
+        <div>
+          <span class="n">动词 02</span>
+          <h3>跳（蓄力）</h3>
+          <p>按住蓄力，松手起跳。轻点是一个小跳，按住是能跨两条东西的高跳。这是游戏唯一的深度。</p>
+        </div>
+        <div>
+          <span class="n">动词 03</span>
+          <h3>二段跳（补偿）</h3>
+          <p>落地前可以用一次，专门用来救「跳短了」。它不是额外的机动手段，是给判断失误的一次机会。</p>
+        </div>
+      </div>
+
+      <div class="nums" data-reveal>
+        <div><b>0.22<u>s</u></b><span>蓄满所需</span></div>
+        <div><b>0.09<u>s</u></b><span>郊狼时间（走出边缘后还能跳）</span></div>
+        <div><b>0.12<u>s</u></b><span>输入缓冲（落地前按的也算）</span></div>
+        <div><b>1<u>次</u></b><span>每次离地可用的二段跳</span></div>
+      </div>
+
+      <p class="muted" style="margin-top:34px">后两个数字是「防手滑」用的。玩家几乎不会察觉，但少了它们，同一个操作会觉得「这游戏不接我的招」——手感大部分是这种看不见的东西撑起来的。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 关卡 ===== -->
+<section class="sec" id="levels">
+  <div class="in">
+    <div class="label"><em>02</em>关卡</div>
+    <div>
+      <h2>五关，一关比一关快，颜色也跟着天亮。</h2>
+      <p class="muted">把关卡切成五段，是因为无尽模式里地形每次都不一样，玩家永远学不会任何东西。切成关卡之后每关固定种子，同一条地形可以练五遍，进步就变得可感知。</p>
+
+      <div class="levels" data-reveal>
+        <div class="row"><span class="i">01</span><span class="name">霓虹起步</span><span class="m">120 m</span><span class="s">380→440</span><span class="d">深夜霓虹</span></div>
+        <div class="row"><span class="i">02</span><span class="name">横越断口</span><span class="m">150 m</span><span class="s">420→490</span><span class="d">霓虹 → 黄昏</span></div>
+        <div class="row"><span class="i">03</span><span class="name">尖刺地带</span><span class="m">170 m</span><span class="s">460→520</span><span class="d">紫红黄昏</span></div>
+        <div class="row"><span class="i">04</span><span class="name">高层步道</span><span class="m">190 m</span><span class="s">490→560</span><span class="d">黄昏 → 黎明</span></div>
+        <div class="row"><span class="i">05</span><span class="name">终局疾驰</span><span class="m">210 m</span><span class="s">520→600</span><span class="d">熔金黎明</span></div>
+        <div class="row"><span class="i">∞</span><span class="name">无尽疾驰</span><span class="m">封顶</span><span class="s">380→620</span><span class="d">天色循环</span></div>
+      </div>
+      <p class="note">通关 = 撞到终点门，冻结世界，结算用时和死亡数。五关过了进无尽模式，最高米数存在 best.json 里。<br>天空、楼群、角色、HUD 全部从同一套调色里取色，所以「天亮了」这件事本身就是进度条。</p>
+
+      <div class="pair" data-reveal>
+        <figure>
+          <img src="assets/traps-layout.png" alt="第 5 关里，锯盘钉在地面块崖边，缺口底部铺了刺床">
+          <figcaption>崖边布点：锯盘就守在块尾，缺口底下是刺床</figcaption>
+        </figure>
+        <figure>
+          <img src="assets/win-panel.png" alt="通关结算面板，显示关卡名、用时与死亡数">
+          <figcaption>通关结算：用时 + 死亡数，sky 冻住</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 陷阱 ===== -->
+<section class="sec" id="traps">
+  <div class="in">
+    <div class="label"><em>03</em>陷阱</div>
+    <div>
+      <h2>三档威胁，看高度就知道该按多久。</h2>
+      <p class="muted">最早那版把刺塞在地块中间，跨过缺口落地之后只剩几十像素就要起跳，等于随机死亡——所以障碍一直不敢放密。这一版把陷阱挪到地形本来就要起跳的位置：块尾崖边。</p>
+
+      <div class="traps" data-reveal>
+        <article>
+          <div class="pic"><img src="assets/trap-tall.png" alt="贴着地面的一排高尖刺，74 像素高"></div>
+          <div class="tx">
+            <span class="k">74 px · 必须蓄力</span>
+            <h3>高刺</h3>
+            <p>最小跳只有 90px 的顶点，但它在刺左边就会开始下落，所以必须真按下去。游戏里最纯粹的「判断」。</p>
+          </div>
+        </article>
+        <article>
+          <div class="pic"><img src="assets/trap-saw.png" alt="贴地左右巡行的红色锯盘"></div>
+          <div class="tx">
+            <span class="k">贴地 · 左右巡 45px</span>
+            <h3>往复锯</h3>
+            <p>很矮，任何一跳都能过去——但它在一个 1.5 秒的周期里左右扫。你要看相位，而不是看距离。</p>
+          </div>
+        </article>
+        <article>
+          <div class="pic"><img src="assets/trap-platform.png" alt="低矮尖刺，上方一条单向平台可以踩着绕过去"></div>
+          <div class="tx">
+            <span class="k">34 px · 或绕行</span>
+            <h3>矮刺 + 平台</h3>
+            <p>轻点就过，起的是节拍作用。约 42% 的刺块上方留了一条单向平台，可以从下面穿上去踩着走——另一条解法。</p>
+          </div>
+        </article>
+      </div>
+
+      <p class="note" style="margin-top:26px">带陷阱的地面块会被强行加宽到「陷阱宽 + 560」，保证跨过缺口落地之后还有一整段跑蓄力的距离。<br>落进缺口也不再是软着陆：底下铺了刺床，同时断口立面判「撞上侧面」。</p>
+
+      <blockquote class="quote" data-reveal>
+        难度靠速度和缺口递进，不靠堆障碍。
+        <cite>— docs/design.md · 设计一页纸</cite>
+      </blockquote>
+
+      <p class="muted" style="margin-top:34px">公平性不靠眼估。自测里的自动驾驶按「先定松手点、再反算蓄力、最后校验到刺左沿时已经抬到刺高」这套规则跑五关，要求 5 关 0 死亡；跑不通就说明地形里有不可解的布点，参数必须改。当前结果：<span style="color:var(--cyan);font-family:var(--mono);font-size:12.5px">28.9 / 32.7 / 34.4 / 35.9 / 37.3 秒，0 死亡</span>。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 更新日志 ===== -->
+<section class="sec" id="log">
+  <div class="in">
+    <div class="label"><em>04</em>更新</div>
+    <div>
+      <h2>做了什么，为什么这么做。</h2>
+      <p class="muted">这游戏是从零手搭的，没有策划案、没有美术，一天一版。下面每一条都能对应到代码里的一段。</p>
+
+      <div class="log" data-reveal>
+        <div class="e">
+          <div class="t">11-21<b>v0.5</b></div>
+          <div>
+            <h4>陷阱，和一次坐标系的清算</h4>
+            <p>加了往复锯、把刺抬到 74px、缺口底下铺刺床。真正花时间的是一个潜伏的 bug：刺的坐标存的是世界坐标，绘制和碰撞却按「块偏移」在用，等于多加了一次块位置——所以刺从来没被画在它真正在的地方。修完之后，前面所有的调参才有意义。</p>
+            <p>后来又补了一刀判定。郊狼时间窗（离地 0.09 秒内还能起跳）本来是为了「自己走下平台不至于冤死」，但它也把「自己跳出去」算了进去：起跳后马上再按一下，会被当成还在地上蓄力——二段跳没了，松手时还把空中的速度重算了一遍，按住不放甚至能白赚一段高度。现在这个窗口只给被动离地；跳出去的再按，就是干脆的一次二段跳。顺带把输入改成每帧采样键状态，切出窗口丢了 keyup 也不会让蓄力条卡在满格。</p>
+            <p>闪退这种问题没法靠猜。本地拿随机按键压了 9 万帧、exe 空跑两分钟内存不涨，也没复现出来——那就先让它留下证据：启动、每次死亡、每 5 秒一次心跳、退出原因，真崩了连堆栈一起写进 exe 旁边的 <code>run.log</code>。日志不修 bug，但能让下一次闪退有据可查，而不是一句「它就没了」。</p>
+          </div>
+        </div>
+        <div class="e">
+          <div class="t">11-20<b>v0.4</b></div>
+          <div>
+            <h4>关卡与终点门</h4>
+            <p>把无限跑切成五关，每关固定种子；加了终点门、通关结算、无尽解锁。顺手修了「终点门悬在缺口上方」——现在门底下那块地面会直接补长，门永远站在实地上。</p>
+          </div>
+        </div>
+        <div class="e">
+          <div class="t">11-19<b>v0.3</b></div>
+          <div>
+            <h4>配色</h4>
+            <p>颜色不是装饰，是进度。深夜霓虹 → 紫红黄昏 → 熔金黎明，天色、楼群、尖刺、HUD 全走同一套调色。同时定了一条可读性铁律：能站的用亮边描，会死的用暖色。</p>
+          </div>
+        </div>
+        <div class="e">
+          <div class="t">11-18<b>v0.2</b></div>
+          <div>
+            <h4>穿墙</h4>
+            <p>薄平台从下方穿过之后，下落时一定贴回顶面；身体卡进地面块侧面判「撞墙」。试过让平台从下方硬挡，自测立刻变成 12 次死亡——否决了，那种「看不见的天花板」不公平。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 跑起来 ===== -->
+<section class="sec" id="run">
+  <div class="in">
+    <div class="label"><em>05</em>跑起来</div>
+    <div>
+      <h2>它现在只是个本地原型。<span class="thin">装两行就能跑。</span></h2>
+      <p class="muted">Python 3.14 有个坑：官方 pygame 还没有 3.14 的预编译包，<code class="mono">pip install pygame</code> 会报 from versions: none。装 pygame-ce，社区维护版，代码里照样 <code class="mono">import pygame</code>，一行不用改。</p>
+
+      <div class="run" data-reveal>
+        <div>
+          <p class="h5"><b>01</b> 装依赖</p>
+          <div class="code">
+            <button class="btn-copy" data-copy="python -m pip install pygame-ce">复制</button><span class="c"># 3.13 及以下用官方包也行</span>
+<span class="p">&gt;</span> python -m pip install pygame-ce
+<span class="c"># 3.14 只能装 ce 版</span>
+          </div>
+        </div>
+        <div>
+          <p class="h5"><b>02</b> 开跑</p>
+          <div class="code">
+            <button class="btn-copy" data-copy="cd D:\游戏原型; python src\jump_run.py">复制</button><span class="p">&gt;</span> cd D:\游戏原型
+<span class="p">&gt;</span> python src\jump_run.py
+<span class="c"># 无窗口自测</span>
+<span class="p">&gt;</span> python src\jump_run.py --selftest 16000
+          </div>
+        </div>
+      </div>
+
+      <div class="dl">
+        <div class="t">
+          <b>不想敲命令，就直接下这个 exe。</b>
+          <code>JumpRunner-v0.5.exe · Windows 64 位 · 双击就跑 · 最高分记在 exe 旁边的 best.json</code>
+        </div>
+        <div class="act">
+          <a class="btn primary" href="download/JumpRunner-v0.5.exe" download>下载 exe · 22 MB</a>
+          <a class="btn" href="download/jump-runner-v0.5.zip">源码 zip · 268 KB</a>
+        </div>
+      </div>
+
+      <p class="note">真闪退了别靠猜：exe 旁边会自己写一份 <code>run.log</code>，最后十几行就够定位——启动、每次死亡、每 5 秒一次心跳、退出原因，崩了就带完整堆栈。</p>
+      <p class="note">操作：按住空格 / ↑ / W / 左键蓄力，松开起跳，空中再按一次是二段跳。Esc 退出。死在哪儿就从哪一关重来，地形不变。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 没做的 ===== -->
+<section class="sec">
+  <div class="in">
+    <div class="label"><em>06</em>还没做的</div>
+    <div>
+      <h2>写在这里，免得看起来比实际更完整。</h2>
+      <div class="not">
+        <li>没有音效，一点都没有</li>
+        <li>没有美术，全部是矩形和三角形</li>
+        <li>没有关卡选择菜单，每次从第 1 关开始</li>
+        <li>没有存档续关，只存无尽模式的最高米数</li>
+        <li>手机不能玩，只有一个键盘版本</li>
+        <li>抖音小游戏跑 JS/TS，这版还不能直接上平台</li>
+      </div>
+      <p class="muted" style="margin-top:28px">下一步不是加内容，是先确认「按住时长 = 跳跃距离」这件事玩家读不读得懂。读不懂的话，整套设计要退回去改成固定两档跳。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 页脚 ===== -->
+<footer>
+  <div class="in">
+    <div class="big">一个人做的灰盒原型。<b>没上架，也没打算很快上架。</b></div>
+    <div class="meta">
+      JUMP RUNNER · 灰盒 v0.5<br>
+      2026 · 盐城<br>
+      本页截图全部来自实机渲染
+      手写 CSS + 一块 canvas，没有框架
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   入场动画
+   ============================================================ */
+(function(){
+  var els = document.querySelectorAll('[data-reveal]');
+  if(!els.length) return;
+  if(!('IntersectionObserver' in window)){
+    els.forEach(function(el){ el.classList.add('rv'); });
+    return;
+  }
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('rv'); io.unobserve(e.target); }});
+  },{threshold:.18, rootMargin:'0px 0px -8% 0px'});
+  els.forEach(function(el){ io.observe(el); });
+})();
+
+/* ============================================================
+   蓄力演示：和游戏同一套常数
+   ============================================================ */
+(function(){
+  var GRAV = 1500, VMIN = 520, VMAX = 880, TMAX = 0.22;
+  var panel = document.getElementById('demoPanel');
+  var cv = document.getElementById('demoCanvas');
+  if(!panel || !cv) return;
+  var ctx = cv.getContext('2d');
+
+  var W = 0, H = 0, DPR = 1, ground = 0;
+  var charging = false, t0 = 0, charge = 0;
+  var y = 0, vy = 0, flying = false, apex = 0, dust = 0;
+  var last = 0;
+
+  function resize(){
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    ground = H - Math.max(34, H*0.16);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function vel(c){ return VMIN + (VMAX - VMIN) * (c / TMAX); }
+  function apexOf(c){ var v = vel(c); return v*v / (2*GRAV); }
+
+  var rCharge = document.getElementById('rCharge');
+  var rVel = document.getElementById('rVel');
+  var rApex = document.getElementById('rApex');
+  var rBar = document.getElementById('rBar');
+
+  function readout(c){
+    rCharge.textContent = Math.round(c*1000);
+    rVel.textContent = Math.round(vel(c));
+    rApex.textContent = Math.round(apexOf(c));
+    rBar.style.width = (c/TMAX*100).toFixed(1) + '%';
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    var scale = Math.min(1, (ground - 16) / 268);   // 顶点最高 258px，压进画布
+
+    // 地面
+    ctx.fillStyle = '#161426';
+    ctx.fillRect(0, ground, W, H-ground);
+    ctx.fillStyle = 'rgba(79,227,220,.5)';
+    ctx.fillRect(0, ground-2, W, 2);
+
+    // 顶点参考线
+    var ap = apexOf(charging ? charge : (flying ? charge : 0));
+    var apY = ground - ap*scale;
+    ctx.strokeStyle = 'rgba(255,194,75,.35)';
+    ctx.setLineDash([5,5]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, apY); ctx.lineTo(W, apY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,194,75,.6)';
+    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.fillText('顶点 ' + Math.round(ap) + ' px', 12, apY - 6);
+
+    // 角色
+    var px = W*0.34, py = ground - 26 - y*scale;
+    ctx.fillStyle = 'rgba(255,240,205,.16)';
+    ctx.fillRect(px-6, py+4, 30, 26);
+    ctx.fillStyle = '#ffe9b0';
+    ctx.fillRect(px, py, 18, 26);
+    ctx.fillStyle = '#1b1830';
+    ctx.fillRect(px+10, py+5, 4, 4);
+
+    // 起跳轨迹预览
+    if(charging && charge > 0.005){
+      var v0 = vel(charge);
+      ctx.strokeStyle = 'rgba(79,227,220,.35)';
+      ctx.beginPath();
+      for(var t=0; t<0.7; t+=0.01){
+        var hh = (v0*t - GRAV*t*t/2)*scale;
+        if(hh < -40) break;
+        var xx = px + 9 + t*(W*0.62);
+        ctx.lineTo(xx, ground - 26 - hh);
+      }
+      ctx.stroke();
+    }
+
+    // 落地尘土
+    if(dust > 0){
+      ctx.fillStyle = 'rgba(255,194,75,' + (dust*0.5) + ')';
+      ctx.fillRect(px-10, ground-4, 38, 3);
+    }
+  }
+
+  function loop(ts){
+    if(!last) last = ts;
+    var dt = Math.min(0.05, (ts - last)/1000); last = ts;
+    if(charging){
+      charge = Math.min(TMAX, (ts - t0)/1000);
+      readout(charge);
+    }
+    if(flying){
+      vy += GRAV*dt; y -= vy*dt;
+      apex = Math.max(apex, y);
+      if(y <= 0){ y = 0; vy = 0; flying = false; dust = 1; }
+    }
+    if(dust > 0) dust = Math.max(0, dust - dt*2.4);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function start(e){
+    if(charging || flying) return;
+    if(e && e.type === 'keydown' && e.repeat) return;
+    if(e && e.pointerType !== undefined){ e.preventDefault(); }
+    charging = true; t0 = performance.now(); charge = 0; apex = 0;
+    readout(0);
+  }
+  function release(){
+    if(!charging) return;
+    charging = false;
+    var c = charge;
+    vy = -vel(c);
+    y = 0; flying = true;
+    readout(c);
+  }
+
+  panel.addEventListener('pointerdown', start);
+  window.addEventListener('pointerup', release);
+  panel.addEventListener('pointercancel', release);
+
+  // 只在演示块可见时接管空格，别抢整页滚动的键
+  if('IntersectionObserver' in window){
+    var visible = false;
+    new IntersectionObserver(function(es){
+      visible = es[0].isIntersecting;
+    },{threshold:.45}).observe(panel);
+    window.addEventListener('keydown', function(e){
+      if(!visible) return;
+      if(e.code === 'Space' || e.key === ' '){
+        e.preventDefault();
+        start(e);
+      }
+    });
+    window.addEventListener('keyup', function(e){
+      if(e.code === 'Space' || e.key === ' ') release();
+    });
+  }
+})();
+
+/* ============================================================
+   代码块复制
+   ============================================================ */
+(function(){
+  document.querySelectorAll('.btn-copy').forEach(function(b){
+    b.addEventListener('click', function(){
+      var txt = b.getAttribute('data-copy') || '';
+      var done = function(){ var t = b.textContent; b.textContent = '已复制'; setTimeout(function(){ b.textContent = t; }, 1400); };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(done, function(){ fallback(txt, done); });
+      } else { fallback(txt, done); }
+    });
+  });
+  function fallback(txt, done){
+    var ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){}
+    document.body.removeChild(ta);
+  }
+})();
+</script>
+</body>
+</html>
+
+
+

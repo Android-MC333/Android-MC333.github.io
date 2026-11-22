@@ -545,7 +545,7 @@ footer .meta{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-
             <h4>陷阱，和一次坐标系的清算</h4>
             <p>加了往复锯、把刺抬到 74px、缺口底下铺刺床。真正花时间的是一个潜伏的 bug：刺的坐标存的是世界坐标，绘制和碰撞却按「块偏移」在用，等于多加了一次块位置——所以刺从来没被画在它真正在的地方。修完之后，前面所有的调参才有意义。</p>
             <p>后来又补了一刀判定。郊狼时间窗（离地 0.09 秒内还能起跳）本来是为了「自己走下平台不至于冤死」，但它也把「自己跳出去」算了进去：起跳后马上再按一下，会被当成还在地上蓄力——二段跳没了，松手时还把空中的速度重算了一遍，按住不放甚至能白赚一段高度。现在这个窗口只给被动离地；跳出去的再按，就是干脆的一次二段跳。顺带把输入改成每帧采样键状态，切出窗口丢了 keyup 也不会让蓄力条卡在满格。</p>
-            <p>闪退这种问题没法靠猜。本地拿随机按键压了 9 万帧、exe 空跑两分钟内存不涨，也没复现出来——那就先让它留下证据：启动、每次死亡、每 5 秒一次心跳、退出原因，真崩了连堆栈一起写进 exe 旁边的 <code>run.log</code>。日志不修 bug，但能让下一次闪退有据可查，而不是一句「它就没了」。</p>
+            <p>闪退这种问题没法靠猜。本地拿随机按键压了 9 万帧、exe 空跑两分钟内存不涨，也没复现出来——那就先让它留下证据：启动、每次死亡、每 5 秒一次心跳、退出原因，真崩了连堆栈一起写进 exe 旁边的 <code>run.log</code>。日志不修 bug，但能让下一次闪退有据可查，而不是一句「它就没了」。顺带把 Esc 从「一秒关窗口」改成暂停：面板上 R 重开本关、Q 退出——按错一下不该赔上整局。</p>
           </div>
         </div>
         <div class="e">
@@ -605,16 +605,16 @@ footer .meta{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-
       <div class="dl">
         <div class="t">
           <b>不想敲命令，就直接下这个 exe。</b>
-          <code>JumpRunner-v0.5.exe · Windows 64 位 · 双击就跑 · 最高分记在 exe 旁边的 best.json</code>
+          <code>JumpRunner-v0.5.exe · Windows 64 位 · 双击就跑 · 最高分和 run.log 都在 exe 旁边的同一个目录</code>
         </div>
         <div class="act">
           <a class="btn primary" href="download/JumpRunner-v0.5.exe" download>下载 exe · 22 MB</a>
-          <a class="btn" href="download/jump-runner-v0.5.zip">源码 zip · 268 KB</a>
+          <a class="btn" href="download/jump-runner-v0.5.zip">源码 zip · 269 KB</a>
         </div>
       </div>
 
-      <p class="note">真闪退了别靠猜：exe 旁边会自己写一份 <code>run.log</code>，最后十几行就够定位——启动、每次死亡、每 5 秒一次心跳、退出原因，崩了就带完整堆栈。</p>
-      <p class="note">操作：按住空格 / ↑ / W / 左键蓄力，松开起跳，空中再按一次是二段跳。Esc 退出。死在哪儿就从哪一关重来，地形不变。</p>
+      <p class="note">下载后先建一个文件夹，把 exe 拖进去再双击——<code>run.log</code>、最高分 <code>best.json</code> 都写在 exe 待着的那一个目录里，不会散到别处。闪退这种事别靠猜：日志里有启动、每次死亡、每 5 秒一次心跳、退出原因，真崩了连完整堆栈一起写进去，把最后十几行发我就能定位。</p>
+      <p class="note">操作：按住空格 / ↑ / W / 左键蓄力，松开起跳，空中再按一次是二段跳。Esc 暂停（面板里 R 重开本关、Q 退出）。死在哪儿就从哪一关重来，地形不变。</p>
     </div>
   </div>
 </section>
@@ -817,7 +817,7 @@ footer .meta{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-
 })();
 
 /* ============================================================
-   代码块复制
+   代码块复
    ============================================================ */
 (function(){
   document.querySelectorAll('.btn-copy').forEach(function(b){
